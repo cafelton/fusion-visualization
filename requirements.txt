@@ -1,0 +1,6 @@
+pandas
+numpy
+bokeh
+requests
+pybase64
+io
