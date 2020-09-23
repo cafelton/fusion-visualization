@@ -25,8 +25,8 @@ theme = Theme(json={
 		'Grid': { 'grid_line_color': "#dddddd"}}})
 curdoc().theme = theme
 #Code framework for clicking on tables from https://stackoverflow.com/questions/55964945/chart-on-click-selection-from-data-table-in-bokeh/55970697#55970697
-fusions = pd.read_csv('fusions/02-09-2020DRR-flair.alignedFusions.tsv', sep='\t', index_col=False)
-reads = pd.read_csv('fusions/02-09-2020DRR-flair.alignedReads.bed', sep='\t', index_col=False,
+fusions = pd.read_csv('02-09-2020DRR-flair.alignedFusions.tsv', sep='\t', index_col=False)
+reads = pd.read_csv('02-09-2020DRR-flair.alignedReads.bed', sep='\t', index_col=False,
 					names=['chrom','chromStart','chromEnd','name','score','strand','thickStart','thickEnd','itemRgb',
 						   'blockCount','blockSizes','blockStarts'])
 
