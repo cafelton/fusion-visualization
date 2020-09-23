@@ -44,7 +44,7 @@ def getReadOrder(myDF, fusionName, currChromPoints):
 	temp = len(readsBoth)
 	readsBoth['rseq'] = readsRight['seq']
 	readsBoth=readsBoth.head(temp)
-	print(readsBoth.head())
+	#print(readsBoth.head())
 	readIDs = list(readsRightOnly.index) + list(readsLeftOnly.index) + list(readsBoth.index)
 	leftSeq = [["-"]*200 for i in range(len(readsRightOnly))] + list(readsLeftOnly['seq']) + list(readsBoth['lseq'])
 	rightSeq = list(readsRightOnly['seq']) + [["-"]*200 for i in range(len(readsLeftOnly))] + list(readsBoth['rseq'])
@@ -118,7 +118,7 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 		readsExpanded['tEnd'] = readsExpanded['sizes'] + readsExpanded['tStart']
 		#print(readsExpanded.head())
 		#print(readsFiltered.shape, readsExpanded.shape)
-		print('done with filtering')
+		#print('done with filtering')
 		return readsExpanded, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip, tickSpaceL, tickSpaceR, genomeRow
 	else:
 		print(len(readsFiltered), fusion_name, set(myReads['fusionID']))
@@ -156,7 +156,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 				min_border=0, toolbar_location='below')#, lod_factor=1)
 	glyph = Text(x="x", y="y", text="text", text_align='center',text_color="black",
 				 text_font="monospace",text_font_size=fontsize)
-	rects = Rect(x="x", y="recty",  width=1, height=1, fill_color="colors",
+	rects = Rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
 				 line_color=None, fill_alpha=1)
 	p1.add_glyph(source, rects)
 	p1.add_glyph(source, glyph)
@@ -179,7 +179,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 def makeFullPlot(fusion_name, currChromPoints, reads_file):
 	readsFiltered, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip, tickSpaceL, tickSpaceR, genomeRow = makeFilteredData(fusion_name, currChromPoints, reads_file)
 	if len(readsFiltered) > 0:
-		print(leftBounds, leftFlip, rightBounds, rightFlip)
+		#print(leftBounds, leftFlip, rightBounds, rightFlip)
 		#['center'] = (readsFiltered['tEnd'] + readsFiltered['tStart'])/2
 		#readsFiltered['width'] = readsFiltered['tEnd'] - readsFiltered['tStart']
 		source = ColumnDataSource(readsFiltered[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']])
@@ -242,7 +242,6 @@ def makeSeqPlot(fusion_name, currChromPoints, reads_file):
 	if rightFlip: glyph = Text(x='tEnd', y="readID", text='seq', text_color='blue', text_align='left', text_baseline='middle', text_font_size='18px', text_font='monospace')
 	else: glyph = Text(x='tStart', y="readID", text='seq', text_color='blue', text_align='left', text_baseline='middle', text_font_size='18px', text_font='monospace')
 	pr.add_glyph(source, glyph)
-	print('hi')
 	breakLineL = Span(location=currPoints[0], dimension='height', line_color='red', line_width=2)
 	breakLineR = Span(location=currPoints[1], dimension='height', line_color='red', line_width=3)
 	pl.renderers.extend([breakLineL])
@@ -282,7 +281,6 @@ def py_callback(attr, old, new):
 	a = 0
 	for i in tableSource.selected.indices:
 		a = i
-	print('hi there')
 	currLayout = curdoc().get_model_by_name('mainLayout').children
 	currLayout.remove(curdoc().get_model_by_name('pl'))
 	currLayout.remove(curdoc().get_model_by_name('pr'))
@@ -293,7 +291,7 @@ def py_callback(attr, old, new):
 	print(currChromPoints, fusionName)
 	if "confirmed reads" in tableSource.data:
 		readIDs, leftSeq, rightSeq = getReadOrder(pd.DataFrame.from_dict(hiddenShortSource.data), fusionName, currChromPoints)
-		print(readIDs)
+		#print(readIDs)
 		pl = view_alignment(readIDs, leftSeq, currChromPoints[0], 'left', plot_width=int(len(readIDs[0])*5.58) + 300)
 		pr = view_alignment(readIDs, rightSeq, currChromPoints[1], 'right', plot_width=300)
 	else:
@@ -311,7 +309,7 @@ def upload_fit_data(attr, old, new):
 	tableSource.data.update(ColumnDataSource(new_df).data)
 
 def upload_reads_data(attr, old, new):
-	print("reads data upload succeeded")
+	#print("reads data upload succeeded")
 	currLayout = curdoc().get_model_by_name('mainLayout').children
 	decoded = b64decode(new)
 	f = io.BytesIO(decoded)
@@ -321,7 +319,6 @@ def upload_reads_data(attr, old, new):
 	fusionName = tableSource.data["#name"][0]
 	firstLine = f.readline().strip().decode("utf-8")
 	f.seek(0)
-	print()
 	if (firstLine[:3] == 'chr'):
 		new_df = pd.read_csv(f, sep='\t', index_col=False, names=['chrom','chromStart','chromEnd','name','score','strand',
 															  'thickStart','thickEnd','itemRgb','blockCount','blockSizes','blockStarts'])
