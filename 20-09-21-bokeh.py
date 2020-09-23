@@ -4,6 +4,7 @@ from bokeh.models import ColumnDataSource, TableColumn, StringFormatter, NumberF
 from bokeh.layouts import column, row, gridplot
 from bokeh.models.glyphs import Rect, Text
 from bokeh.themes import Theme
+from bokeh.colors import RGB
 from bokeh.plotting import curdoc, figure
 from math import pi
 import pandas as pd
@@ -126,7 +127,8 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 def get_colors(seqs):
 	"""make colors for bases in sequence"""
 	text = [i for s in list(seqs) for i in s]
-	clrs =  {'A':'red','T':'green','G':'orange','C':'blue','-':'white'}
+	#clrs =  {'A':'red','T':'green','G':'orange','C':'blue','-':'white'}
+	clrs = {'T':RGB(153, 204, 153), 'A':RGB(255, 153, 153), 'G':RGB(255, 219, 153), 'C':RGB(153, 153, 255), '-':'white'}
 	colors = [clrs[i] for i in text]
 	return colors
 
@@ -155,11 +157,12 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	glyph = Text(x="x", y="y", text="text", text_align='center',text_color="black",
 				 text_font="monospace",text_font_size=fontsize)
 	rects = Rect(x="x", y="recty",  width=1, height=1, fill_color="colors",
-				 line_color=None, fill_alpha=0.4)
-	p1.add_glyph(source, glyph)
+				 line_color=None, fill_alpha=1)
 	p1.add_glyph(source, rects)
-	breakLine = Span(location=int(chromPoints[2]), dimension='height', line_color='red', line_width=2)
-	pl.renderers.extend([breakLine])
+	p1.add_glyph(source, glyph)
+	#print('break line at', chromPoints[2])
+	breakLine = Span(location=int(chromPoints[2])-0.5, dimension='height', line_color='red', line_width=2)
+	p1.renderers.extend([breakLine])
 	p1.grid.visible = False
 	p1.xaxis.major_label_text_font_style = "bold"
 	p1.yaxis.minor_tick_line_width = 0
@@ -344,7 +347,7 @@ def upload_reads_data(attr, old, new):
 	#VERY IMPORTANT
 	#hiddenSource.data.update(ColumnDataSource(new_df).data)
 
-
+pageTitle = Div(text='Long read gene fusion visualization', style={'font-size': '24px', 'text-decoration':'underline'})
 fileTitle = Div(text='Fusion file (.tsv)')
 file2Title = Div(text='Reads file (.bed)')
 file_input = FileInput(accept=".tsv", name='fusion')#title='Fusion file (.tsv)')
@@ -357,7 +360,7 @@ tableSource.selected.on_change('indices', py_callback)
 #callback = CustomJS(args = dict(source = tableSource, filteredSource = tableSource), code = source_code)
 #tableSource.selected.js_on_change('indices', callback)
 #data_table.on_change('indices', data_callback)
-subColumn = column([fileTitle, file_input, file2Title, file_input2, data_table], name='subColumn')
+subColumn = column([pageTitle, fileTitle, file_input, file2Title, file_input2, data_table], name='subColumn')
 mainLayout = row([subColumn, pl, pr], name='mainLayout')
 curdoc().add_root(mainLayout)
 
