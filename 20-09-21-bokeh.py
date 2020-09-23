@@ -148,7 +148,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	#use recty for rect coords with an offset
 	recty = gy+.5
 	#now we can create the ColumnDataSource with all the arrays
-	source = ColumnDataSource(dict(x=gx, y=gy, recty=recty, text=text, colors=colors))
+	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=recty, text=text, colors=colors))
 	plot_height = len(seqs)*20+90
 	view_range = (center-20, center+20)
 	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width, plot_height=plot_height,
@@ -161,7 +161,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	p1.add_glyph(source, rects)
 	p1.add_glyph(source, glyph)
 	#print('break line at', chromPoints[2])
-	breakLine = Span(location=int(chromPoints[2])-0.5, dimension='height', line_color='red', line_width=2)
+	breakLine = Span(location=int(chromPoints[2]), dimension='height', line_color='red', line_width=2)
 	p1.renderers.extend([breakLine])
 	p1.grid.visible = False
 	p1.xaxis.major_label_text_font_style = "bold"
