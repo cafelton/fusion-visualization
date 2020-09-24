@@ -124,18 +124,11 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 		print(len(readsFiltered), fusion_name, set(myReads['fusionID']))
 		return readsFiltered, [], [], [], [], False, False, 0, 0, 0
 
-def get_colors(seqs):
-	"""make colors for bases in sequence"""
-	text = [i for s in list(seqs) for i in s]
-	#clrs =  {'A':'red','T':'green','G':'orange','C':'blue','-':'white'}
-	clrs = {'T':RGB(153, 204, 153), 'A':RGB(255, 153, 153), 'G':RGB(255, 219, 153), 'C':RGB(153, 153, 255), '-':'white'}
-	colors = [clrs[i] for i in text]
-	return colors
-
 def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800):
 	"""Bokeh sequence alignment view"""
 	text = [i for s in list(seqs) for i in s]
-	colors = get_colors(seqs)
+	clrs = {'T':RGB(153, 204, 153), 'A':RGB(255, 153, 153), 'G':RGB(255, 219, 153), 'C':RGB(153, 153, 255), '-':'white'}
+	colors = [clrs[i] for i in text]
 	N = len(seqs[0])/2
 	center = int(chromPoints[2])
 	x = np.arange(center-N,center+N)
