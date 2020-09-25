@@ -149,11 +149,11 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 				min_border=0, toolbar_location='below')#, lod_factor=1)
 	glyph = Text(x="x", y="y", text="text", text_align='center',text_color="black",
 				 text_font="monospace",text_font_size=fontsize)
-	rects = Rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
-			 line_color=None, fill_alpha=1)
+	rects = Rect(x="x", y="recty",  width=0.9, height=1) #fill_color="colors",
+	#		 line_color=None, fill_alpha=1)
 	p1.add_glyph(source, rects)
 	#p1.add_glyph(Rect(x=center, y=gy[0]+0.5, width=10, height=1, fill_color="black"))
-	#p1.add_glyph(source, glyph)
+	p1.add_glyph(source, glyph)
 	#print('break line at', chromPoints[2])
 	breakLine = Span(location=int(chromPoints[2]), dimension='height', line_color='red', line_width=2)
 	p1.renderers.extend([breakLine])
