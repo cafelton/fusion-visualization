@@ -150,7 +150,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	glyph = Text(x="x", y="y", text="text", text_align='center',text_color="black",
 				 text_font="monospace",text_font_size=fontsize)
 	p1.rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
-				 line_color=None, fill_alpha=1)
+				 line_color=None, fill_alpha=1, source=source)
 	#p1.add_glyph(source, rects)
 	p1.add_glyph(source, glyph)
 	#print('break line at', chromPoints[2])
