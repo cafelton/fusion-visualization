@@ -141,10 +141,10 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	gx = xx.ravel()
 	gy = yy.flatten()
 	#now we can create the ColumnDataSource with all the arrays
-	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+1, rectx1=gx, rectx2=gx+1, text=text, colors=colors))
+	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, rectx1=gx, rectx2=gx+1, text=text, colors=colors))
 	plot_height = len(seqs)*20+90
 	view_range = (center-20, center+20)
-	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width, plot_height=plot_height,
+	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width,plot_height=plot_height,
 				x_range=view_range, y_range=ids, tools="xpan,reset",
 				min_border=0, toolbar_location='below')#, lod_factor=1)
 	glyph = Text(x="x", y="y", text="text", text_align='center',text_color="black",
@@ -152,7 +152,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 # 	p1.rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
 # 				 line_color=None, fill_alpha=1, source=source)
 	p1.segment(x0='rectx1', y0='recty', x1='rectx2',
-				   y1='recty', color="colors", line_width=10, source=source)
+				   y1='recty', color="colors", line_width=14, source=source)
 	#p1.add_glyph(source, rects)
 	p1.add_glyph(source, glyph)
 	#print('break line at', chromPoints[2])
