@@ -37,11 +37,13 @@ def getReadOrder(myDF, fusionName, currChromPoints):
 	myDF = myDF.set_index('id')
 	readsLeft = myDF.loc[(myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[0][0]), :].copy()
 	readsRight = myDF.loc[(myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[1][0]), :].copy()
+	readsRight = readsRight[~readsRight.index.duplicated(keep='first')]
 	readsLeftOnly = readsLeft.loc[~readsLeft.index.isin(list(readsRight.index))].copy()
 	readsRightOnly = readsRight.loc[~readsRight.index.isin(list(readsLeft.index))].copy()
 	readsBoth = readsLeft.loc[readsLeft.index.isin(list(readsRight.index))].copy()
 	readsBoth = readsBoth.rename(columns={'seq':'lseq'})
 	temp = len(readsBoth)
+	#print(readsRight.head(20))
 	readsBoth['rseq'] = readsRight['seq']
 	readsBoth=readsBoth.head(temp)
 	#print(readsBoth.head())
@@ -138,10 +140,8 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	#flattens the arrays
 	gx = xx.ravel()
 	gy = yy.flatten()
-	#use recty for rect coords with an offset
-	recty = gy+.5
 	#now we can create the ColumnDataSource with all the arrays
-	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=recty, text=text, colors=colors))
+	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, text=text, colors=colors))
 	plot_height = len(seqs)*20+90
 	view_range = (center-20, center+20)
 	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width, plot_height=plot_height,
@@ -152,6 +152,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	rects = Rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
 				 line_color=None, fill_alpha=1)
 	p1.add_glyph(source, rects)
+	p1.add_glyph(Rect(x=center, y=gy[0]+0.5, width=10, height=1, fill_color="black"))
 	p1.add_glyph(source, glyph)
 	#print('break line at', chromPoints[2])
 	breakLine = Span(location=int(chromPoints[2]), dimension='height', line_color='red', line_width=2)
