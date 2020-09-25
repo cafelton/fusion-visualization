@@ -141,7 +141,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	gx = xx.ravel()
 	gy = yy.flatten()
 	#now we can create the ColumnDataSource with all the arrays
-	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, text=text, colors=colors))
+	source = ColumnDataSource(dict(x=gx+0.5, y=gy, rectx1=gx, rectx2=gx+1, recty=gy+0.25, text=text, colors=colors))
 	plot_height = len(seqs)*20+90
 	view_range = (center-20, center+20)
 	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width, plot_height=plot_height,
@@ -151,10 +151,12 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 				 text_font="monospace",text_font_size=fontsize)
 	#rects = Rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
 	#		 line_color=None, fill_alpha=1)
-	p1.add_glyph(source, Rect(x="x", y="y",  width=0.9, height=1, fill_color="colors",
-			 line_color=None, fill_alpha=1))
 	#p1.add_glyph(Rect(x=center, y=gy[0]+0.5, width=10, height=1, fill_color="black"))
+	p1.segment(x0='rectx1', y0='recty', x1='rectx2',
+			y1='recty', color="colors", line_width=5, source=source)
 	p1.add_glyph(source, glyph)
+	#p1.add_glyph(source, Rect(x="x", y="y",  width=0.9, height=1, fill_color="colors",
+	#		 line_color=None, fill_alpha=1))
 	#print('break line at', chromPoints[2])
 	breakLine = Span(location=int(chromPoints[2]), dimension='height', line_color='red', line_width=2)
 	p1.renderers.extend([breakLine])
