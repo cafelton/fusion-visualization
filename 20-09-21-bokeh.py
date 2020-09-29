@@ -1,11 +1,12 @@
 from bokeh.models import ColumnDataSource, TableColumn, StringFormatter, NumberFormatter, DataTable, CustomJS, FixedTicker, \
 	PrintfTickFormatter, HBar, LinearAxis, Range1d, FuncTickFormatter, PanTool,ResetTool,BoxZoomTool, CustomJSFilter, \
-	CDSView, Span, BasicTickFormatter, SingleIntervalTicker, Dropdown, Text, Div
+	CDSView, Span, BasicTickFormatter, SingleIntervalTicker, Dropdown, Text, Div, NumeralTickFormatter
 from bokeh.layouts import column, row, gridplot
 from bokeh.models.glyphs import Rect, Text
 from bokeh.themes import Theme
 from bokeh.colors import RGB
 from bokeh.plotting import curdoc, figure
+from collections import OrderedDict
 from math import pi
 import pandas as pd
 import requests
@@ -57,8 +58,8 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 	if isinstance(reads_file, pd.DataFrame):
 		myReads = reads_file
 	else: myReads = reads
-	temp = myReads['name'].str.split('-.-', expand=True)
-	myReads[['fusionID','readID','geneName', 'seq']] = temp[temp.columns[0:4]]
+	#temp = [x.split('-.-') for x in myReads['name']]#myReads['name'].str.split('-.-', expand=True)
+	myReads[['fusionID','readID','geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:4] for x in myReads['name']], index= myReads.index)#temp[temp.columns[0:4]]
 	myReads['geneName'] = myReads['geneName'].str.split('/', expand = True)[0]
 	#if loc != None: readsFiltered = myReads.loc[reads['fusionID']==fusions.at[loc, '#name'], :].copy()
 	readsFiltered = myReads.loc[myReads['fusionID']==fusion_name, :].copy()
@@ -71,8 +72,6 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 	readsFiltered['chartLoc'] = np.where(readsFiltered['chartLoc'], 'left', 'right')
 	leftRF, rightRF = readsFiltered[readsFiltered['chartLoc'] == 'left'].fillna(method='bfill', axis=0), \
 					  readsFiltered[readsFiltered['chartLoc'] == 'right'].fillna(method='bfill', axis=0)
-	# print(currChromPoints)
-	# print(leftRF.head(), rightRF.head())
 	if len(leftRF) > 0 and len(rightRF) > 0:
 		numForMean = int(len(leftRF)*0.05) if int(len(leftRF)*0.05) > 3 else 3
 		if len(leftRF) <= 3:
@@ -118,12 +117,10 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 		readsExpanded[['starts', 'sizes']] = readsExpanded[['starts', 'sizes']].apply(pd.to_numeric)
 		readsExpanded['tStart'] = readsExpanded['starts'] + readsExpanded['chromStart']
 		readsExpanded['tEnd'] = readsExpanded['sizes'] + readsExpanded['tStart']
-		#print(readsExpanded.head())
-		#print(readsFiltered.shape, readsExpanded.shape)
-		#print('done with filtering')
+		print(readsExpanded.head())
 		return readsExpanded, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip, tickSpaceL, tickSpaceR, genomeRow
 	else:
-		print(len(readsFiltered), fusion_name, set(myReads['fusionID']))
+		print(len(readsFiltered), fusion_name)#, set(myReads['fusionID']))
 		return readsFiltered, [], [], [], [], False, False, 0, 0, 0
 
 def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800):
@@ -141,18 +138,19 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	gx = xx.ravel()
 	gy = yy.flatten()
 	#now we can create the ColumnDataSource with all the arrays
+	#source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, text=text, colors=colors))
 	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, rectx1=gx, rectx2=gx+1, text=text, colors=colors))
 	plot_height = len(seqs)*20+90
 	view_range = (center-20, center+20)
-	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width,plot_height=plot_height,
+	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width, plot_height=plot_height,
 				x_range=view_range, y_range=ids, tools="xpan,reset",
 				min_border=0, toolbar_location='below')#, lod_factor=1)
 	glyph = Text(x="x", y="y", text="text", text_align='center',text_color="black",
 				 text_font="monospace",text_font_size=fontsize)
-# 	p1.rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
-# 				 line_color=None, fill_alpha=1, source=source)
+	# p1.rect(x="x", y="recty",  width=0.9, height=1, fill_color="colors",
+	# 			 line_color=None, fill_alpha=1)
 	p1.segment(x0='rectx1', y0='recty', x1='rectx2',
-				   y1='recty', color="colors", line_width=14, source=source)
+			   y1='recty', color="colors", line_width=14, source=source)
 	#p1.add_glyph(source, rects)
 	p1.add_glyph(source, glyph)
 	#print('break line at', chromPoints[2])
@@ -174,17 +172,18 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 def makeFullPlot(fusion_name, currChromPoints, reads_file):
 	readsFiltered, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip, tickSpaceL, tickSpaceR, genomeRow = makeFilteredData(fusion_name, currChromPoints, reads_file)
 	if len(readsFiltered) > 0:
-		#print(leftBounds, leftFlip, rightBounds, rightFlip)
-		#['center'] = (readsFiltered['tEnd'] + readsFiltered['tStart'])/2
-		#readsFiltered['width'] = readsFiltered['tEnd'] - readsFiltered['tStart']
+		if '|' in readsFiltered.at[0, 'readID']:
+			readsFiltered['isoSupport'] = readsFiltered['readID'].str.split('|', expand=True)[0].astype(int)
+			readsFiltered = readsFiltered.sort_values(by='isoSupport')
 		source = ColumnDataSource(readsFiltered[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']])
 		readsFiltered = readsFiltered.reset_index(drop=True)
-		#print(readsFiltered.shape)
 		tools=[BoxZoomTool(dimensions='width'), PanTool(), ResetTool()]
-		pl = figure(name='pl', title=currChromPoints[0][0] + " " + str(currChrom[0]), y_range=list(set(readsFiltered['readID'])),
-					plot_width=(len(readsFiltered.loc[0, 'readID'])*6)+300, plot_height=len(list(set(readsFiltered['readID'])))*15+150, x_range=(leftBounds[0], leftBounds[1]), tools=tools, toolbar_location=None)
-		pr = figure(name='pr', title=currChromPoints[1][0] + ' ' + str(currChrom[1]), y_range=pl.y_range, plot_width=300, plot_height=len(list(set(readsFiltered['readID'])))*15+150,
-					x_range=(rightBounds[0], rightBounds[1]), tools=tools, toolbar_location='right')
+		pl = figure(name='pl', title=currChromPoints[0][0] + " " + str(currChrom[0]), y_range=list(OrderedDict.fromkeys(readsFiltered['readID'])),
+					plot_width=(len(readsFiltered.loc[0, 'readID'])*6)+300, plot_height=len(list(set(readsFiltered['readID'])))*15+150,
+					x_range=(leftBounds[0], leftBounds[1]), tools=tools, toolbar_location=None, min_border_bottom=100)
+		pr = figure(name='pr', title=currChromPoints[1][0] + ' ' + str(currChrom[1]), y_range=pl.y_range, plot_width=300,
+					plot_height=len(list(set(readsFiltered['readID'])))*15+150,
+					x_range=(rightBounds[0], rightBounds[1]), tools=tools, toolbar_location='right', min_border_bottom=100)
 		pl.segment(x0='tStart', y0='readID', x1='tEnd',
 				   y1='readID', color="green", line_width=5, source=source)
 		pr.segment(x0='tStart', y0='readID', x1='tEnd',
@@ -196,7 +195,7 @@ def makeFullPlot(fusion_name, currChromPoints, reads_file):
 		pr.renderers.extend([breakLineR])
 
 		pl.below[0].formatter.use_scientific = False
-		pl.add_layout(LinearAxis(ticker=SingleIntervalTicker(interval=tickSpaceL), formatter=BasicTickFormatter(use_scientific=False)), 'above')
+		#pl.add_layout(LinearAxis(ticker=SingleIntervalTicker(interval=tickSpaceL), formatter=BasicTickFormatter(use_scientific=False)), 'above')
 		pl.xaxis.ticker = SingleIntervalTicker(interval=tickSpaceL)
 		pl.xaxis.major_label_orientation = pi/4
 		pl.ygrid.grid_line_color = None
@@ -204,7 +203,7 @@ def makeFullPlot(fusion_name, currChromPoints, reads_file):
 		pl.y_range.range_padding = 0
 
 		pr.below[0].formatter.use_scientific = False
-		pr.add_layout(LinearAxis(ticker=SingleIntervalTicker(interval=tickSpaceR), formatter=BasicTickFormatter(use_scientific=False)), 'above')
+		#pr.add_layout(LinearAxis(ticker=SingleIntervalTicker(interval=tickSpaceR), formatter=BasicTickFormatter(use_scientific=False)), 'above')
 		pr.xaxis.ticker = SingleIntervalTicker(interval=tickSpaceR)
 		pr.xaxis.major_label_orientation = pi/4
 		pr.ygrid.grid_line_color = None
@@ -214,51 +213,6 @@ def makeFullPlot(fusion_name, currChromPoints, reads_file):
 		return pl, pr
 	else:
 		return figure(), figure()
-
-def makeSeqPlot(fusion_name, currChromPoints, reads_file):
-	readsFiltered, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip, tickSpaceL, tickSpaceR, genomeRow = makeFilteredData(fusion_name, currChromPoints, reads_file)
-	tickSpaceL, tickSpaceR = 5, 5
-	#chars = readsFiltered['seq'].apply(lambda x: pd.Series(list(x))).stack().str.strip().reset_index(level=1, drop=True)
-	#chars.name = 'seqChars'
-	#readsFiltered = readsFiltered.join(chars).reset_index(drop=True)
-	source = ColumnDataSource(readsFiltered[['readID','tStart', 'tEnd', 'seq']])
-	tools=[BoxZoomTool(dimensions='width'), PanTool(), ResetTool()]
-	myRange = pd.Series(readsFiltered['readID']).drop_duplicates().sort_index(ascending=False).tolist()
-	pl = figure(name='pl', title=currChromPoints[0][0] + " " + str(currChrom[0]), y_range=myRange, plot_width=446,#(len(readsFiltered.loc[0, 'readID'])*6)+300,
-				plot_height=len(list(set(readsFiltered['readID'])))*15+150, x_range=(leftBounds[1]-20, leftBounds[1]),
-				tools=tools, toolbar_location=None, min_border_left=250)
-	if leftFlip: pl.x_range = Range1d(leftBounds[1]+20, leftBounds[1])
-	pr = figure(name='pr', title=currChromPoints[1][0] + ' ' + str(currChrom[1]), y_range=pl.y_range, plot_width=230, plot_height=len(list(set(readsFiltered['readID'])))*15+150,
-				x_range=(rightBounds[0], rightBounds[0] + 20), tools=tools, toolbar_location='right')
-	if rightFlip: pr.x_range = Range1d(rightBounds[0], rightBounds[0] - 20)
-	if leftFlip: glyph = Text(x='tStart', y="readID", text='seq', text_color='green', text_align='right', text_baseline='middle', text_font_size='18px', text_font='monospace')
-	else: glyph = Text(x='tEnd', y="readID", text='seq', text_color='green', text_align='right', text_baseline='middle', text_font_size='18px', text_font='monospace')
-	pl.add_glyph(source, glyph)
-	if rightFlip: glyph = Text(x='tEnd', y="readID", text='seq', text_color='blue', text_align='left', text_baseline='middle', text_font_size='18px', text_font='monospace')
-	else: glyph = Text(x='tStart', y="readID", text='seq', text_color='blue', text_align='left', text_baseline='middle', text_font_size='18px', text_font='monospace')
-	pr.add_glyph(source, glyph)
-	breakLineL = Span(location=currPoints[0], dimension='height', line_color='red', line_width=2)
-	breakLineR = Span(location=currPoints[1], dimension='height', line_color='red', line_width=3)
-	pl.renderers.extend([breakLineL])
-	pr.renderers.extend([breakLineR])
-
-	pl.below[0].formatter.use_scientific = False
-	pl.add_layout(LinearAxis(ticker=SingleIntervalTicker(interval=tickSpaceL), formatter=BasicTickFormatter(use_scientific=False)), 'above')
-	pl.xaxis.ticker = SingleIntervalTicker(interval=tickSpaceL)
-	pl.xaxis.major_label_orientation = pi/4
-	pl.ygrid.grid_line_color = None
-	pl.xgrid.ticker =  SingleIntervalTicker(interval=1)
-	pl.y_range.range_padding = 0
-
-	pr.below[0].formatter.use_scientific = False
-	pr.add_layout(LinearAxis(ticker=SingleIntervalTicker(interval=tickSpaceR), formatter=BasicTickFormatter(use_scientific=False)), 'above')
-	pr.xaxis.ticker = SingleIntervalTicker(interval=tickSpaceR)
-	pr.xaxis.major_label_orientation = pi/4
-	pr.ygrid.grid_line_color = None
-	pr.xgrid.ticker = SingleIntervalTicker(interval=1)
-	pr.y_range.range_padding = 0
-	pr.yaxis.visible = False
-	return pl, pr
 
 hiddenSource = ColumnDataSource(reads)
 hiddenShortSource = ColumnDataSource()
