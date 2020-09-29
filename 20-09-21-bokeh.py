@@ -35,6 +35,7 @@ reads = pd.read_csv('02-09-2020DRR-flair.alignedReads.bed', sep='\t', index_col=
 currFusion = 0
 
 def getReadOrder(myDF, fusionName, currChromPoints):
+	seqLen = len(myDF.at[0, 'seq'])
 	myDF = myDF.set_index('id')
 	readsLeft = myDF.loc[(myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[0][0]), :].copy()
 	readsRight = myDF.loc[(myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[1][0]), :].copy()
@@ -44,17 +45,17 @@ def getReadOrder(myDF, fusionName, currChromPoints):
 	readsBoth = readsLeft.loc[readsLeft.index.isin(list(readsRight.index))].copy()
 	readsBoth = readsBoth.rename(columns={'seq':'lseq'})
 	temp = len(readsBoth)
-	#print(readsRight.head(20))
 	readsBoth['rseq'] = readsRight['seq']
 	readsBoth=readsBoth.head(temp)
-	#print(readsBoth.head())
+	readsRightOnly = readsRightOnly.head(25)
+	readsLeftOnly = readsLeftOnly.head(25)
+	readsBoth = readsBoth.head(50)
 	readIDs = list(readsRightOnly.index) + list(readsLeftOnly.index) + list(readsBoth.index)
-	leftSeq = [["-"]*200 for i in range(len(readsRightOnly))] + list(readsLeftOnly['seq']) + list(readsBoth['lseq'])
-	rightSeq = list(readsRightOnly['seq']) + [["-"]*200 for i in range(len(readsLeftOnly))] + list(readsBoth['rseq'])
+	leftSeq = [["-"]*seqLen for i in range(len(readsRightOnly))] + list(readsLeftOnly['seq']) + list(readsBoth['lseq'])
+	rightSeq = list(readsRightOnly['seq']) + [["-"]*seqLen for i in range(len(readsLeftOnly))] + list(readsBoth['rseq'])
 	return readIDs, leftSeq, rightSeq
 
 def makeFilteredData(fusion_name, currChromPoints, reads_file):
-	#print(fusions.head())
 	if isinstance(reads_file, pd.DataFrame):
 		myReads = reads_file
 	else: myReads = reads
@@ -64,7 +65,6 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 	#if loc != None: readsFiltered = myReads.loc[reads['fusionID']==fusions.at[loc, '#name'], :].copy()
 	readsFiltered = myReads.loc[myReads['fusionID']==fusion_name, :].copy()
 	#currChromPoints = [fusions.loc[fusions['#name']==fusion_name, "5' breakpoint"].item().split("-")[1:], fusions.loc[fusions['#name']==fusion_name, "3' breakpoint"].item().split("-")[1:]]
-	#print(len(readsFiltered), fusion_name)
 	# if currChromPoints[0][0][:3] == 'chr':
 	# 	readsFiltered['chartLoc'] = readsFiltered['geneName'].split('-') == currChromPoints[0][0]
 	# else:
@@ -96,11 +96,9 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 			rightBounds = rightBounds[::-1]
 			rightFlip = True
 			rightStart = rightBounds[0] - 30
-		#print(leftBounds, leftFlip, rightBounds, rightFlip)
 		leftSeq, rightSeq = requests.get('http://togows.org/api/ucsc/hg38/chr' + str(currChromPoints[0][1]) + ':' + str(leftStart+1) + '-' + str(leftStart + 41) + '.fasta').text, \
 							requests.get('http://togows.org/api/ucsc/hg38/chr' + str(currChromPoints[1][1]) + ':' + str(rightStart+1) + '-' + str(rightStart + 41) + '.fasta').text
 		leftShortSeq, rightShortSeq = leftSeq.strip().split('\n')[1], rightSeq.strip().split('\n')[1]
-		#print('done w/ web call')
 		if leftFlip: leftShortSeq = leftShortSeq[::-1]
 		if rightFlip: rightShortSeq = rightShortSeq[::-1]
 		genomeRow = pd.DataFrame({'readID':['hg38 sequence', 'hg38 sequence'], 'chromStart': [leftStart, rightStart], 'chromEnd':[leftStart + 40, rightStart + 40], 'seq':[leftShortSeq, rightShortSeq]})
@@ -117,7 +115,7 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 		readsExpanded[['starts', 'sizes']] = readsExpanded[['starts', 'sizes']].apply(pd.to_numeric)
 		readsExpanded['tStart'] = readsExpanded['starts'] + readsExpanded['chromStart']
 		readsExpanded['tEnd'] = readsExpanded['sizes'] + readsExpanded['tStart']
-		print(readsExpanded.head())
+		#print(readsExpanded.head())
 		return readsExpanded, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip, tickSpaceL, tickSpaceR, genomeRow
 	else:
 		print(len(readsFiltered), fusion_name)#, set(myReads['fusionID']))
