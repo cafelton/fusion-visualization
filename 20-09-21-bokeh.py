@@ -60,11 +60,11 @@ def view_fasta(myDF, readName, fusionName, plot_width=750, fontsize='9pt'):
 	plot_height = len(seqs)*20+100
 	#entire sequence view (no text, with zoom)
 	x_range = Range1d(0, len(seqs[0]), bounds='auto')
-	p = figure(name='fullReadView', title=readName, plot_width= plot_width, plot_height=100,
+	p = figure(name='fullReadView', title=readName, plot_width= plot_width, plot_height=50 + 10*len(seqs),
 			   x_range=x_range, y_range=list(OrderedDict.fromkeys(ids)), tools="xwheel_zoom, xpan",
 			   min_border=0, toolbar_location='right')
 	p.segment(x0='rectx1', y0='recty', x1='rectx2',
-			   y1='recty', color="colors", line_width=3, source=source, alpha=0.5)
+			   y1='recty', color="colors", line_width=5, source=source, alpha=0.5)
 	p.yaxis.visible = False
 	p.grid.visible = False
 	p1 = figure(name='50bpView', plot_width=plot_width, plot_height=plot_height,
@@ -118,6 +118,7 @@ def getReadOrder(myDF, fusionName, currChromPoints):
 
 def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800):
 	"""Bokeh sequence alignment view"""
+	#if len(seqs[0])
 	text = [i for s in list(seqs) for i in s]
 	clrs = {'T':RGB(153, 204, 153), 'A':RGB(255, 153, 153), 'G':RGB(255, 219, 153), 'C':RGB(153, 153, 255), '-':'white', 'N':'white'}
 	colors = [clrs[i] for i in text]
@@ -153,6 +154,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 		p1.name = 'pr'
 		p1.min_border_left = 10
 		p1.yaxis.visible=False
+	#print(p1.y_range.factors)
 	return p1, source
 
 def makeFilteredData(fusion_name, currChromPoints, reads_file):
@@ -164,16 +166,17 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 	readsFiltered['chartLoc'] = np.where(readsFiltered['chartLoc'], 'left', 'right')
 	leftRF, rightRF = readsFiltered[readsFiltered['chartLoc'] == 'left'].fillna(method='bfill', axis=0), \
 					  readsFiltered[readsFiltered['chartLoc'] == 'right'].fillna(method='bfill', axis=0)
-	if len(leftRF) > 0 and len(rightRF) > 0:
-		numForMean = int(len(leftRF)*0.05) if int(len(leftRF)*0.05) > 3 else 3
+	if len(readsFiltered) > 0:#len(leftRF) > 0 and len(rightRF) > 0:
+		if len(leftRF) > 0: numForMean = int(len(leftRF)*0.05) if int(len(leftRF)*0.05) > 3 else 3
+		elif len(rightRF) > 0: numForMean = int(len(rightRF)*0.05) if int(len(rightRF)*0.05) > 3 else 3
 		if len(leftRF) <= 3:
-			leftBounds, rightBounds = [min(list(leftRF['chromStart'])), max(list(leftRF['chromEnd']))], \
-									  [min(list(rightRF['chromStart'])), max(list(rightRF['chromEnd']))]
+			leftBounds = [min(list(leftRF['chromStart'])), max(list(leftRF['chromEnd']))] if len(leftRF) > 0 else [0,1]
+			rightBounds = [min(list(rightRF['chromStart'])), max(list(rightRF['chromEnd']))] if len(rightRF) > 0 else [0,1]
 		else:
-			leftBounds, rightBounds = [int(np.partition(leftRF['chromStart'].to_numpy(), numForMean)[:numForMean].mean()),
-									   int(np.partition(leftRF['chromEnd'].to_numpy(), (-1* numForMean))[(-1*numForMean):].mean())], \
-									  [int(np.partition(rightRF['chromStart'].to_numpy(), numForMean)[:numForMean].mean()),
-									   int(np.partition(rightRF['chromEnd'].to_numpy(), (-1* numForMean))[(-1*numForMean):].mean())]
+			leftBounds = [int(np.partition(leftRF['chromStart'].to_numpy(), numForMean)[:numForMean].mean()),
+									   int(np.partition(leftRF['chromEnd'].to_numpy(), (-1* numForMean))[(-1*numForMean):].mean())] if len(leftRF) > 0 else [0,1]
+			rightBounds = [int(np.partition(rightRF['chromStart'].to_numpy(), numForMean)[:numForMean].mean()),
+									   int(np.partition(rightRF['chromEnd'].to_numpy(), (-1* numForMean))[(-1*numForMean):].mean())] if len(rightRF) > 0 else [0,1]
 		leftFlip, rightFlip = False, False
 		currChrom = [currChromPoints[0][1], currChromPoints[1][1]]
 		currPoints = [int(currChromPoints[0][2]), int(currChromPoints[1][2])]
@@ -198,14 +201,16 @@ def makeFilteredData(fusion_name, currChromPoints, reads_file):
 		readsExpanded[['starts', 'sizes']] = readsExpanded[['starts', 'sizes']].apply(pd.to_numeric)
 		readsExpanded['tStart'] = readsExpanded['starts'] + readsExpanded['chromStart']
 		readsExpanded['tEnd'] = readsExpanded['sizes'] + readsExpanded['tStart']
-		#print(readsExpanded.head())
+		print(readsExpanded.head())
 		return readsExpanded, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip
 	else:
 		print(len(readsFiltered), fusion_name)#, set(myReads['fusionID']))
-		return readsFiltered, [], [], [], [], False, False, 0, 0, 0
+		return readsFiltered, [], [], [], [], False, False
 
 def makeFullPlot(fusion_name, currChromPoints, reads_file):
 	readsFiltered, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip = makeFilteredData(fusion_name, currChromPoints, reads_file)
+	#print(readsFiltered[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']].head())
+	#return figure(name='pl'), figure(name='pr')
 	if len(readsFiltered) > 0:
 		if '|' in readsFiltered.at[0, 'readID']:
 			readsFiltered['isoSupport'] = readsFiltered['readID'].str.split('|', expand=True)[0].astype(int)
@@ -363,6 +368,7 @@ def upload_table_data(attr, old, new):
 		new_df['spanning reads'] = new_df['confirmed reads']
 	elif "confirmed reads" in tableSource.data:
 		tableSource.remove("confirmed reads")
+	new_df = new_df.sort_values('spanning reads', ascending=False)
 	tableSource.data.update(ColumnDataSource(new_df).data)
 	curdoc().get_model_by_name('informUser').text = 'fusions uploaded'
 
@@ -382,3 +388,4 @@ tableSource.selected.on_change('indices', table_click_callback)
 subColumn = column([pageTitle, fusionUploadTitle, fusionUpload, readsUploadTitle, readsUpload, fastaUploadTitle, fastaUpload, informUser, data_table], name='subColumn')
 mainLayout = row([subColumn, pl, pr], name='mainLayout')
 curdoc().add_root(mainLayout)
+
