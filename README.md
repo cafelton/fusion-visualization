@@ -1,9 +1,19 @@
 # fusion-visualization
 
+This is a tool intended to help visualize gene fusions detected from longread RNA sequencing. Currently it only works with the output files from the flair-fusion pipeline. 
+* This can be run through 9-28-bam-to-fusions-pipe.py, with additional functionality from 
+ * remapFusions.py - makes zoomed in view and improves accuracy of fusion point
+ * matchIsoforms.py - matches isoforms to reads and provides user with more condensed view (must be used with isoform reads from flair collapse (https://github.com/BrooksLabUCSC/flair)
+ * multiMapReads.py - maps locations of reads on chromosome back to fasta, providing additional information and confidence about whether multimapping is the result of a fusion or repetitive/common sequence
+
 The default files loaded are from an amplicon fusion dataset, so will have more reads per fusion than most files.
+
 Click on any row of the table to view that fusion
+
 Click on the title row of the table to sort by any column
+
 When loading in files, make sure to load the top .tsv file first
+
 If the screen freezes or stops responding to clicks, just refresh the page and it will reset to the default files and try again.
 
 There are 3 possible file sets that you can load in:
