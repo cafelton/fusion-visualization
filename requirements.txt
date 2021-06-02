@@ -3,3 +3,4 @@ numpy
 bokeh
 requests
 pybase64
+selenium
