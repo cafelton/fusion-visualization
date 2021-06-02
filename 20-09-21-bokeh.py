@@ -16,6 +16,21 @@ import requests
 from pybase64 import b64decode
 import io, subprocess
 import numpy as np
+from bokeh.io import show
+from bokeh.models import Button, CustomJS
+from random import randint
+from bokeh.io import output_file, show
+from bokeh.layouts import widgetbox
+from bokeh.models.widgets import RadioButtonGroup
+from bokeh.models.widgets import DataTable, DateFormatter, TableColumn, HTMLTemplateFormatter
+from bokeh.io import output_notebook, show
+from bokeh.plotting import curdoc, figure
+from random import randint
+from bokeh.io import output_file, show
+from bokeh.models import ColumnDataSource
+from bokeh.io import export_png
+from PIL import Image
+import base64
 
 theme = Theme(json={
 	'attrs': {
@@ -28,77 +43,28 @@ theme = Theme(json={
 			'minor_tick_line_color': None},
 		'Grid': { 'grid_line_color': "#dddddd"}}})
 curdoc().theme = theme
-#Code framework for clicking on tables from https://stackoverflow.com/questions/55964945/chart-on-click-selection-from-data-table-in-bokeh/55970697#55970697
-#Sequence aligner code from https://dmnfarrell.github.io/bioinformatics/bokeh-sequence-aligner
-fusions = pd.read_csv('02-09-2020DRR-flair.alignedFusions.tsv', sep='\t', index_col=False)
-reads = pd.read_csv('02-09-2020DRR-flair.alignedReads.bed', sep='\t', index_col=False,
+annotations = pd.read_csv('gencode.v37.annotation-edited.tsv', sep='\t', index_col=False, header=0) #names=['chrom','chromStart','chromEnd','name','score','strand','thickStart','thickEnd','itemRgb',
+						   #'blockCount','blockSizes','blockStarts', 'starts', 'sizes', 'tStart', 'tEnd'])
+
+fusions = pd.read_csv('02-09-2020DRR-flair.alignedFusion-final.tsv', sep='\t', index_col=False)
+reads = pd.read_csv('02-09-2020DRR-flair.alignedReads-final.bed', sep='\t', index_col=False,
 					names=['chrom','chromStart','chromEnd','name','score','strand','thickStart','thickEnd','itemRgb',
-						   'blockCount','blockSizes','blockStarts'])
+						   'blockCount','blockSizes','blockStarts', 'cigar', 'sequence'])
 reads[['fusionID','readID','geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:4] for x in reads['name']], index= reads.index)#temp[temp.columns[0:4]]
 reads['geneName'] = reads['geneName'].str.split('/', expand = True)[0]
 currFusion = 0
 
-def view_fasta(myDF, readName, fusionName, plot_width=750, fontsize='9pt'):
-	myDF = myDF.set_index('id')
-	inFusionReads = myDF.loc[(myDF['read']=='REF'+readName) & (myDF['fusion']==fusionName), :].copy()
-	outFusionReads = myDF.loc[(myDF['read']=='REF'+readName) & (myDF['fusion']!=fusionName) & (myDF['fusion']!='reference'), :].copy()
-	ref = myDF.loc[(myDF['read']=='REF'+readName) & (myDF['fusion']=='reference'), :].copy()
-	print(len(ref))
-	ids = list(outFusionReads.index) + list(inFusionReads.index) + ['RAW READ SEQUENCE']
-	seqs = list(outFusionReads['seq']) + list(inFusionReads['seq']) + list(ref['seq'])
-	t = [list(i) for i in seqs]
-	text = [item for sublist in t for item in sublist]
-	clrs = {'T':RGB(101,194,101), 'A':RGB(255, 84,84), 'G':RGB(255, 195,84), 'C':RGB(87,87, 255), '-':'white', 'N':'white'}
-	colors = [clrs[i] for i in text]
-	x = [list(np.arange(0, len(seqs[0]))) for i in range(len(seqs))]
-	gx = [item for sublist in x for item in sublist]
-	gx1 = [i + 0.5 for i in gx]
-	gx2 = [i + 1 for i in gx]
-	y = [[i]*len(seqs[0]) for i in ids]
-	gy = [item for sublist in y for item in sublist]
-	source = ColumnDataSource(dict(x=gx1, recty=gy, rectx1=gx, rectx2=gx2, text=text, colors=colors))# y=gy, recty=gy+0.5,
-	plot_height = len(seqs)*20+100
-	#entire sequence view (no text, with zoom)
-	x_range = Range1d(0, len(seqs[0]), bounds='auto')
-	p = figure(name='fullReadView', title=readName, plot_width= plot_width, plot_height=50 + 10*len(seqs),
-			   x_range=x_range, y_range=list(OrderedDict.fromkeys(ids)), tools="xwheel_zoom, xpan",
-			   min_border=0, toolbar_location='right')
-	p.segment(x0='rectx1', y0='recty', x1='rectx2',
-			   y1='recty', color="colors", line_width=5, source=source, alpha=0.5)
-	p.yaxis.visible = False
-	p.grid.visible = False
-	p1 = figure(name='50bpView', plot_width=plot_width, plot_height=plot_height,
-				x_range=(0, 50), y_range=list(OrderedDict.fromkeys(ids)), tools="xpan,reset",
-				min_border_bottom=50, min_border_top=50, toolbar_location='right')#, lod_factor=1)
-	p1.segment(x0='rectx1', y0='recty', x1='rectx2',
-			   y1='recty', color="colors", line_width=14, source=source, alpha=0.5)
-	glyph = Text(x="x", y="recty", text="text", text_align='center',text_color="black",
-				 text_font="monospace",text_font_size=fontsize, text_baseline='middle')
-	p1.add_glyph(source, glyph)
-	p1.grid.visible = False
-	p1.add_layout(LinearAxis(formatter=BasicTickFormatter(use_scientific=False), major_label_orientation = pi/4), 'above')
-	p1.xaxis.major_label_text_font_style = "bold"
-	p1.yaxis.minor_tick_line_width = 0
-	p1.yaxis.major_tick_line_width = 0
-	p1.below[0].formatter.use_scientific = False
-	p1.xaxis.major_label_orientation = pi/4
-	p.on_event(Tap, full_view_click_callback)
-	print('done making plot')
-	#p1.y_range = FactorRange(factors=ids)
-	#p1.name='pl'
-	return column([p, p1], name='pl')
-
 def getReadOrder(myDF, fusionName, currChromPoints):
 	seqLen = len(myDF.at[0, 'seq'])
 	myDF = myDF.set_index('id')
-	leftRefSeq = myDF.loc[(myDF.index =='reference') & (myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[0][0]), :].copy()
-	rightRefSeq = myDF.loc[(myDF.index =='reference') & (myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[1][0]), :].copy()
+	leftRefSeq = myDF.loc[(myDF.index =='reference') & (myDF['fusion'].str.contains(fusionName)) & (myDF['gene'] == currChromPoints[0][0]), :].copy()
+	rightRefSeq = myDF.loc[(myDF.index =='reference') & (myDF['fusion'].str.contains(fusionName)) & (myDF['gene'] == currChromPoints[1][0]), :].copy()
 	if len(leftRefSeq) < 1: leftRefSeq['ref'] = '-' * seqLen
-	else: myDF.drop(myDF.loc[(myDF.index =='reference') & (myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[0][0])].index, inplace=True)
+	else: myDF.drop(myDF.loc[(myDF.index =='reference') & (myDF['fusion'].str.contains(fusionName)) & (myDF['gene'] == currChromPoints[0][0])].index, inplace=True)
 	if len(rightRefSeq) < 1: rightRefSeq['ref'] = '-' * seqLen
-	else: myDF.drop(myDF.loc[(myDF.index =='reference') & (myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[1][0])].index, inplace=True)
-	readsLeft = myDF.loc[(myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[0][0]), :].copy()
-	readsRight = myDF.loc[(myDF['fusion']==fusionName) & (myDF['gene'] == currChromPoints[1][0]), :].copy()
+	else: myDF.drop(myDF.loc[(myDF.index =='reference') & (myDF['fusion'].str.contains(fusionName)) & (myDF['gene'] == currChromPoints[1][0])].index, inplace=True)
+	readsLeft = myDF.loc[(myDF['fusion'].str.contains(fusionName)) & (myDF['gene'] == currChromPoints[0][0]), :].copy()
+	readsRight = myDF.loc[(myDF['fusion'].str.contains(fusionName)) & (myDF['gene'] == currChromPoints[1][0]), :].copy()
 	readsRight = readsRight[~readsRight.index.duplicated(keep='first')]
 	readsLeftOnly = readsLeft.loc[~readsLeft.index.isin(list(readsRight.index))].copy()
 	readsRightOnly = readsRight.loc[~readsRight.index.isin(list(readsLeft.index))].copy()
@@ -109,7 +75,6 @@ def getReadOrder(myDF, fusionName, currChromPoints):
 	readsBoth=readsBoth.head(temp)
 	readsRightOnly = readsRightOnly.head(25)
 	readsLeftOnly = readsLeftOnly.head(25)
-	print("shared reads ", len(readsBoth))
 	readsBoth = readsBoth.head(50)
 	readIDs = list(readsRightOnly.index) + list(readsLeftOnly.index) + list(readsBoth.index) + ['REFERENCE SEQUENCE']
 	leftSeq = [["-"]*seqLen for i in range(len(readsRightOnly))] + list(readsLeftOnly['seq']) + list(readsBoth['lseq']) + list(leftRefSeq['seq'])
@@ -118,9 +83,8 @@ def getReadOrder(myDF, fusionName, currChromPoints):
 
 def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800):
 	"""Bokeh sequence alignment view"""
-	#if len(seqs[0])
 	text = [i for s in list(seqs) for i in s]
-	clrs = {'T':RGB(153, 204, 153), 'A':RGB(255, 153, 153), 'G':RGB(255, 219, 153), 'C':RGB(153, 153, 255), '-':'white', 'N':'white'}
+	clrs = {'T':RGB(153, 204, 153), 'A':RGB(255, 153, 153), 'G':RGB(255, 219, 153), 'C':RGB(153, 153, 255), '-':'white', 'N':'white', '*':'white'}
 	colors = [clrs[i] for i in text]
 	N = len(seqs[0])/2
 	center = int(chromPoints[2])
@@ -129,7 +93,7 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 	xx, yy = np.meshgrid(x, y)
 	gx = xx.ravel()
 	gy = yy.flatten()
-	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, rectx1=gx, rectx2=gx+1, text=text, colors=colors)) #id=ids - too short, doesn't match
+	source = ColumnDataSource(dict(x=gx+0.5, y=gy, recty=gy+0.5, rectx1=gx, rectx2=gx+1, text=text, colors=colors))
 	plot_height = len(seqs)*20+200
 	view_range = (center-20, center+20)
 	p1 = figure(title=' '.join(chromPoints), plot_width=plot_width, plot_height=plot_height,
@@ -154,172 +118,133 @@ def view_alignment(ids, seqs, chromPoints, side, fontsize="9pt", plot_width=800)
 		p1.name = 'pr'
 		p1.min_border_left = 10
 		p1.yaxis.visible=False
-	#print(p1.y_range.factors)
 	return p1, source
 
-def makeFilteredData(fusion_name, currChromPoints, reads_file):
-	myReads = reads_file
-	# myReads[['fusionID','readID','geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:4] for x in myReads['name']], index= myReads.index)#temp[temp.columns[0:4]]
-	# myReads['geneName'] = myReads['geneName'].str.split('/', expand = True)[0]
-	readsFiltered = myReads.loc[myReads['fusionID']==fusion_name, :].copy()
-	readsFiltered['chartLoc'] = readsFiltered['geneName'] == currChromPoints[0][0]
-	readsFiltered['chartLoc'] = np.where(readsFiltered['chartLoc'], 'left', 'right')
-	leftRF, rightRF = readsFiltered[readsFiltered['chartLoc'] == 'left'].fillna(method='bfill', axis=0), \
-					  readsFiltered[readsFiltered['chartLoc'] == 'right'].fillna(method='bfill', axis=0)
-	if len(readsFiltered) > 0:#len(leftRF) > 0 and len(rightRF) > 0:
-		if len(leftRF) > 0: numForMean = int(len(leftRF)*0.05) if int(len(leftRF)*0.05) > 3 else 3
-		elif len(rightRF) > 0: numForMean = int(len(rightRF)*0.05) if int(len(rightRF)*0.05) > 3 else 3
-		if len(leftRF) <= 3:
-			leftBounds = [min(list(leftRF['chromStart'])), max(list(leftRF['chromEnd']))] if len(leftRF) > 0 else [0,1]
-			rightBounds = [min(list(rightRF['chromStart'])), max(list(rightRF['chromEnd']))] if len(rightRF) > 0 else [0,1]
-		else:
-			leftBounds = [int(np.partition(leftRF['chromStart'].to_numpy(), numForMean)[:numForMean].mean()),
-									   int(np.partition(leftRF['chromEnd'].to_numpy(), (-1* numForMean))[(-1*numForMean):].mean())] if len(leftRF) > 0 else [0,1]
-			rightBounds = [int(np.partition(rightRF['chromStart'].to_numpy(), numForMean)[:numForMean].mean()),
-									   int(np.partition(rightRF['chromEnd'].to_numpy(), (-1* numForMean))[(-1*numForMean):].mean())] if len(rightRF) > 0 else [0,1]
-		leftFlip, rightFlip = False, False
-		currChrom = [currChromPoints[0][1], currChromPoints[1][1]]
-		currPoints = [int(currChromPoints[0][2]), int(currChromPoints[1][2])]
-		a = [abs(i-int(currChromPoints[0][2])) for i in leftBounds]
-		if a[0] < a[1]:
-			leftBounds = leftBounds[::-1]
-			leftFlip = True
-		a = [abs(i-int(currChromPoints[1][2])) for i in rightBounds]
-		if a[1] < a[0]:
-			rightBounds = rightBounds[::-1]
-			rightFlip = True
-		tickSpaceL, tickSpaceR = int(abs(leftBounds[0] - leftBounds[1])/6.), int(abs(rightBounds[0] - rightBounds[1])/6.)
-		if leftFlip: leftBounds[0] += tickSpaceL
-		else: leftBounds[0] -= tickSpaceL
-		if rightFlip: rightBounds[1] -= tickSpaceR
-		else: rightBounds[1] += tickSpaceR
-		readsFiltered = readsFiltered[readsFiltered['readID'].isin(list(set(readsFiltered['readID']))[:200])]
-		sizes = readsFiltered['blockSizes'].str.split(',', expand=True).stack().str.strip().reset_index(level=1, drop=True)
-		starts = readsFiltered['blockStarts'].str.split(',', expand=True).stack().str.strip().reset_index(level=1, drop=True)
-		temp = pd.concat([starts,sizes], axis=1, keys=['starts','sizes'])
-		readsExpanded = readsFiltered.join(temp).reset_index(drop=True)
-		readsExpanded[['starts', 'sizes']] = readsExpanded[['starts', 'sizes']].apply(pd.to_numeric)
-		readsExpanded['tStart'] = readsExpanded['starts'] + readsExpanded['chromStart']
-		readsExpanded['tEnd'] = readsExpanded['sizes'] + readsExpanded['tStart']
-		print(readsExpanded.head())
-		return readsExpanded, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip
-	else:
-		print(len(readsFiltered), fusion_name)#, set(myReads['fusionID']))
-		return readsFiltered, [], [], [], [], False, False
-
-def makeFullPlot(fusion_name, currChromPoints, reads_file):
-	readsFiltered, currChrom, currPoints, leftBounds, rightBounds, leftFlip, rightFlip = makeFilteredData(fusion_name, currChromPoints, reads_file)
-	#print(readsFiltered[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']].head())
-	#return figure(name='pl'), figure(name='pr')
-	if len(readsFiltered) > 0:
-		if '|' in readsFiltered.at[0, 'readID']:
-			readsFiltered['isoSupport'] = readsFiltered['readID'].str.split('|', expand=True)[0].astype(int)
-			readsFiltered = readsFiltered.sort_values(by='isoSupport')
-		source = ColumnDataSource(readsFiltered[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']])
-		readsFiltered = readsFiltered.reset_index(drop=True)
-		tools=[BoxZoomTool(dimensions='width'), WheelZoomTool(dimensions='width'), PanTool(), ResetTool()]
-		pl = figure(name='pl', title=currChromPoints[0][0] + " " + str(currChrom[0]), y_range=list(OrderedDict.fromkeys(readsFiltered['readID'])),
-					plot_width=(len(readsFiltered.loc[0, 'readID'])*6)+300, plot_height=len(list(set(readsFiltered['readID'])))*15+220,
-					x_range=(leftBounds[0], leftBounds[1]), tools=tools, toolbar_location=None, min_border_bottom=100, min_border_top=100)
-		pr = figure(name='pr', title=currChromPoints[1][0] + ' ' + str(currChrom[1]), y_range=pl.y_range, plot_width=300,
-					plot_height=len(list(set(readsFiltered['readID'])))*15+220,
-					x_range=(rightBounds[0], rightBounds[1]), tools=tools, toolbar_location='right', min_border_bottom=100, min_border_top=100)
-		pl.segment(x0='tStart', y0='readID', x1='tEnd', y1='readID', color="green", line_width=5, source=source)
-		pr.segment(x0='tStart', y0='readID', x1='tEnd', y1='readID', color="blue", line_width=5, source=source)
-		pl.renderers.extend([Span(location=currPoints[0], dimension='height', line_color='red', line_width=3)])
-		pr.renderers.extend([Span(location=currPoints[1], dimension='height', line_color='red', line_width=3)])
-
-		pl.below[0].formatter.use_scientific = False
-		pl.add_layout(LinearAxis(formatter=BasicTickFormatter(use_scientific=False), major_label_orientation = pi/4), 'above')
-		pl.xaxis.major_label_orientation = pi/4
-		pl.ygrid.grid_line_color = None
-		pl.y_range.range_padding = 0
-		pr.below[0].formatter.use_scientific = False
-		pr.add_layout(LinearAxis(formatter=BasicTickFormatter(use_scientific=False), major_label_orientation = pi/4), 'above')
-		pr.xaxis.major_label_orientation = pi/4
-		pr.ygrid.grid_line_color = None
-		pr.y_range.range_padding = 0
-		pr.yaxis.visible = False
-		return pl, pr
-	else:
-		return figure(), figure()
+def data_table_formatter(selected_opt, table_source):
+	# https://stackoverflow.com/questions/50996875/how-to-color-rows-and-or-cells-in-a-bokeh-datatable
+	if selected_opt == 0:
+		template = """
+					<p style="color:<%=
+						(function colorfromint(){
+							if( subgroup == " ")
+								{return('green')}
+							}()) %>;">
+						<%= value %>
+					</p>
+					"""
+	elif selected_opt == 1:
+		template = """
+					<p style="color:<%=
+						(function colorfromint(){
+							count = (name.split("--").length - 1)
+							if ((remap_spanning_reads > 0 || subgroup.includes('--')) && count < 2)
+								{return('red')}
+							}()) %>;">
+						<%= value %>
+					</p>
+					"""
+	elif selected_opt == 2:
+		template = """
+					<p style="color:<%=
+						(function colorfromint(){
+							if ( num_of_isoform > 0)
+								{return('blue')}
+							}()) %>;">
+						<%= value %>
+					</p>
+					"""
+	formatter = HTMLTemplateFormatter(template=template)
+	columns = [TableColumn(field="name", title="Name", formatter=formatter, width=390),
+			   TableColumn(field="subgroup", title="Subgroup Name", formatter=formatter, width=450),  ##ADDED
+			   TableColumn(field="mapping_score", title="Map Score", formatter=formatter),
+			   TableColumn(field="spanning_reads", title="Spanning Reads", formatter=formatter),
+			   TableColumn(field='seq_agreement_near_breakpoint', title='Seq. Agreement', formatter=formatter),
+			   TableColumn(field='num_of_isoform', title='Isoforms', formatter=formatter),
+			   TableColumn(field='fraction_repetitive', title='Frac. Repetitive',
+						   formatter=formatter)]
+	data_table = DataTable(source=table_source, columns=columns, fit_columns=True, width=420, height_policy='auto',
+						   editable=False,
+						   reorderable=False, name='tableSource', sortable=True, row_height=30)
+	return data_table
 
 hiddenSource = ColumnDataSource(reads)
 hiddenShortSource = ColumnDataSource()
 hiddenFilteredSource = ColumnDataSource()
 hiddenFastaSource = ColumnDataSource()
-pl, pr = makeFullPlot("PIWIL4--GUCY1A2",[fusions.loc[currFusion, "5' breakpoint"].split("-")[1:],
-										 fusions.loc[currFusion, "3' breakpoint"].split("-")[1:]], pd.DataFrame.from_dict(hiddenSource.data))
-columns = [TableColumn(field = "#name", title = "Name", formatter=StringFormatter(), width=390),
-		   TableColumn(field = "mapping score(1 is good)", title = "Map Score", formatter=NumberFormatter(format='0.000')),
-		   TableColumn(field = "spanning reads", title = "Spanning Reads"),#, formatter=NumberFormatter(format='0')),
-		   TableColumn(field='seq agreement near breakpoint (1 is good)', title='Seq. Agreement', formatter=NumberFormatter(format='0.000')),
-		   TableColumn(field='fraction repetitive (0 is good)', title='Frac. Repetitive', formatter=NumberFormatter(format='0.000'))]
+hiddenButtonSource = ColumnDataSource(data={"selected":[0]})
+pl, pr = figure(name = "pl"), figure(name = "pr")
 tableSource = ColumnDataSource(fusions)
-data_table = DataTable(source = tableSource, columns = columns, width = 420, height_policy ='auto', editable = False,
-					   reorderable = False, name='tableSource', sortable=True)
+anoSource = ColumnDataSource(annotations)
+data_table = data_table_formatter(0, tableSource)
 
 def table_click_callback(attr, old, new):
 	if len(tableSource.selected.indices) > 0:
 		curdoc().get_model_by_name('informUser').text = 'fusion selection registered'
-		a = tableSource.selected.indices[0]
+		a = tableSource.selected.indices[0] #<-- a = row that is selected
 		currLayout = curdoc().get_model_by_name('mainLayout').children
+		subLayout = curdoc().get_model_by_name('subColumn').children
 		currChromPoints = [['-'.join(tableSource.data["5' breakpoint"][a].strip("5'-").split("-")[:-2])] + tableSource.data["5' breakpoint"][a].split("-")[-2:],
 						   ['-'.join(tableSource.data["3' breakpoint"][a].strip("3'-").split("-")[:-2])] + tableSource.data["3' breakpoint"][a].split("-")[-2:]]
-		fusionName = tableSource.data["#name"][a]
-		print(currChromPoints, fusionName)
-		if "confirmed reads" in tableSource.data:
-			readIDs, leftSeq, rightSeq = getReadOrder(pd.DataFrame.from_dict(hiddenShortSource.data), fusionName, currChromPoints)
-			pl, myData = view_alignment(readIDs, leftSeq, currChromPoints[0], 'left', plot_width=int(len(readIDs[0])*5.58) + 300)
-			pr, temp = view_alignment(readIDs, rightSeq, currChromPoints[1], 'right', plot_width=300)
-			hiddenFilteredSource.data.update(myData.data)
-			pl.on_event(Tap, chart_click_callback)
+		if tableSource.data["name"][a] == " ":
+			fusionName = tableSource.data["subgroup"][a]
 		else:
-			pl, pr = makeFullPlot(fusionName, currChromPoints, pd.DataFrame.from_dict(hiddenSource.data))
-		currLayout.remove(curdoc().get_model_by_name('pl'))
-		currLayout.remove(curdoc().get_model_by_name('pr'))
-		currLayout.append(pl)
-		currLayout.append(pr)
+			fusionName = tableSource.data["name"][a]
+		if len(fusionName.split("--")) > 2:
+			for i in range(len(fusionName.split("--")) - 2):
+				currChromPoints += [['-'.join(tableSource.data[str(i + 2) + "-5'"][a].strip("5'-").split("-")[:-2])] +
+									tableSource.data[str(i + 2) + "-5'"][a].split("-")[-2:],
+									['-'.join(tableSource.data[str(i + 2) + "-3'"][a].strip("3'-").split("-")[:-2])] +
+									tableSource.data[str(i + 2) + "-3'"][a].split("-")[-2:]]
+		if(hiddenButtonSource.data["selected"][0] == 1):
+			data_table = data_table_formatter(1, tableSource) ##
+			readIDs, leftSeq, rightSeq = getReadOrder(pd.DataFrame.from_dict(hiddenShortSource.data), fusionName, currChromPoints)
+			pl, myData = view_alignment(readIDs, leftSeq, currChromPoints[0], 'left', plot_width=int(len(readIDs[0])*5.58) + 400)
+			pr, temp = view_alignment(readIDs, rightSeq, currChromPoints[1], 'right', plot_width=320)
+			figList = [pl, pr]
+			hiddenFilteredSource.data.update(myData.data)
+		elif (hiddenButtonSource.data["selected"][0] == 0):
+			data_table = data_table_formatter(0, tableSource) ##
+			temp = pd.DataFrame.from_dict(hiddenSource.data)
+			notisoformOnly = temp[temp["isoform support"].astype(int) == 0]
+			if tableSource.data["name"][a] != " ":
+				figList = makeFullPlot2(fusionName, currChromPoints, notisoformOnly, anoSource)
+			else:
+				figList = [figure(name="p0"), figure(name="p1")]
+		elif (hiddenButtonSource.data["selected"][0] == 2):
+			data_table = data_table_formatter(2, tableSource) ##
+			isoformReads = float(tableSource.data["num_of_isoform"][a]) #"isoform spanning reads" ###changed from int to float
+			if isoformReads > 0:
+				temp = pd.DataFrame.from_dict(hiddenSource.data)
+				isoformOnly = temp[temp["isoform support"].astype(int) > 0]
+				if len(isoformOnly) > 0:
+					figList = makeFullPlot2(fusionName, currChromPoints, isoformOnly, anoSource)
+					# figList = makeFullPlot2(fusionName, currChromPoints, isoformOnly)
+				else:
+			  		figList = [figure(name="p0"), figure(name="p1")]
+			else:
+			  	figList = [figure(name="p0"), figure(name="p1")]
+		else:
+			figList = [figure(name = "p0"), figure(name = "p1")]
+		if (buttonSource.data["press"][-1] == 1): ###
+			currLayout.remove(curdoc().get_model_by_name('pl'))
+			currLayout.remove(curdoc().get_model_by_name('pr'))
+		else:
+			for i in range(len(currLayout) -1):
+				currLayout.remove(curdoc().get_model_by_name('p'+str(i)))
+		subLayout.remove(curdoc().get_model_by_name("tableSource")) ##
+		subLayout.append(data_table)
+		for i in figList:
+			currLayout.append(i)
 		curdoc().get_model_by_name('informUser').text = 'fusion reads chart updated'
-
-def chart_click_callback(event):
-	curdoc().get_model_by_name('informUser').text = 'click registered'
-	plTemp = curdoc().get_model_by_name('pl')
-	print(plTemp.y_range.factors[round(event.y-0.5)])#(hiddenFilteredSource.data['id'][round(event.y-0.5)])
-	if bool(hiddenFastaSource.data):
-		currLayout = curdoc().get_model_by_name('mainLayout').children
-		fusionName = tableSource.data["#name"][tableSource.selected.indices[0]]
-		tableSource.selected.indices = []
-		readName = plTemp.y_range.factors[round(event.y-0.5)]#hiddenFilteredSource.data['id'][round(event.y-0.5)]
-		pl = view_fasta(pd.DataFrame.from_dict(hiddenFastaSource.data), readName, fusionName)
-		pr = figure(name='pr')
-		currLayout.remove(curdoc().get_model_by_name('pl'))
-		currLayout.remove(curdoc().get_model_by_name('pr'))
-		currLayout.append(pl)
-		currLayout.append(pr)
-		print(currLayout)
-	curdoc().get_model_by_name('informUser').text = 'single read chart loaded'
+		buttonSource.stream(dict(press=[hiddenButtonSource.data["selected"][0]], figs=[len(figList)]))
 
 def full_view_click_callback(event):
 	curdoc().get_model_by_name('informUser').text = 'click registered'
-	#fullView = curdoc().get_model_by_name('fullReadView')#50bpView
 	center = int(event.x)#(hiddenFilteredSource.data['id'][round(event.y-0.5)])
 	curdoc().get_model_by_name('informUser').text = 'click registered - ' + str(int(event.x))
 	bpView = curdoc().get_model_by_name('50bpView')#'fullReadView')#50bpView
 	bpView.x_range.start = center-25
 	bpView.x_range.end = center+25
-
-def upload_fasta_data(attr, old, new):
-	curdoc().get_model_by_name('informUser').text = 'uploading fasta'
-	decoded = b64decode(new)
-	f = io.BytesIO(decoded)
-	readsList = []
-	for line in f:
-		line = line.decode('utf-8').strip().split('\t')
-		readsList.append([line[0], line[3].split('->')[0], ('->').join(line[3].split('->')[:-1]), line[11]])
-	myDF = pd.DataFrame(readsList, columns=['read', 'fusion', 'id', 'seq'])
-	hiddenFastaSource.data.update(ColumnDataSource(myDF).data)
-	curdoc().get_model_by_name('informUser').text = 'fasta uploaded'
 
 def upload_reads_data(attr, old, new):
 	curdoc().get_model_by_name('informUser').text = 'uploading reads'
@@ -328,49 +253,198 @@ def upload_reads_data(attr, old, new):
 	f = io.BytesIO(decoded)
 	currChromPoints = [['-'.join(tableSource.data["5' breakpoint"][0].strip("5'-").split("-")[:-2])] + tableSource.data["5' breakpoint"][0].split("-")[-2:],
 					   ['-'.join(tableSource.data["3' breakpoint"][0].strip("3'-").split("-")[:-2])] + tableSource.data["3' breakpoint"][0].split("-")[-2:]]
-	print(currChromPoints)
-	fusionName = tableSource.data["#name"][0]
-	firstLine = f.readline().strip().decode("utf-8")
-	f.seek(0)
-	if (firstLine[:3] == 'chr'):
-		new_df = pd.read_csv(f, sep='\t', index_col=False, names=['chrom','chromStart','chromEnd','name','score','strand',
-																  'thickStart','thickEnd','itemRgb','blockCount','blockSizes','blockStarts'])
-		new_df[['fusionID','readID','geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:4] for x in new_df['name']], index= new_df.index)#temp[temp.columns[0:4]]
-		new_df['geneName'] = new_df['geneName'].str.split('/', expand = True)[0]
-		pl, pr = makeFullPlot(fusionName, currChromPoints, new_df)
-		hiddenSource.data.update(ColumnDataSource(new_df).data)
-		if "confirmed reads" in tableSource.data:
-			tableSource.remove("confirmed reads")
+	fusionName = tableSource.data["name"][0]
+	if len(fusionName.split("--")) > 2:
+		for i in range(len(fusionName.split("--")) - 2):
+			currChromPoints += [['-'.join(tableSource.data[str(i + 2) + "-5'"][0].strip("5'-").split("-")[:-2])] +
+								tableSource.data[str(i + 2) + "-5'"][0].split("-")[-2:],
+								['-'.join(tableSource.data[str(i + 2) + "-3'"][0].strip("3'-").split("-")[:-2])] +
+								tableSource.data[str(i + 2) + "-3'"][0].split("-")[-2:]]
+
+	new_df = pd.read_csv(f, sep='\t', index_col=False,
+			names=['chrom', 'chromStart', 'chromEnd', 'name', 'score', 'strand','thickStart','thickEnd','itemRgb','blockCount','blockSizes','blockStarts', 'cigar', 'sequence'])
+	new_df[['fusionID', 'isoform support', 'remapped', 'readID', 'geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:6] for x in new_df['name']],
+																	index=new_df.index)  # temp[temp.columns[0:4]]
+	new_df['geneName'] = new_df['geneName'].str.split('/', expand=True)[0]
+
+	remappedOnly = new_df[new_df["remapped"] == "R"] #<-PUT BACK LATER after you fix bedfilecorrecter
+	remappedOnly = remappedOnly[["fusionID", "geneName", "readID", "seq"]]
+	remappedOnly.columns = ['fusion', 'gene', 'id', 'seq']
+	figList = makeFullPlot2(fusionName, currChromPoints, new_df, anoSource)
+	# figList = makeFullPlot2(fusionName, currChromPoints, new_df)
+	hiddenShortSource.data.update(ColumnDataSource(remappedOnly).data)
+	hiddenSource.data.update(ColumnDataSource(new_df).data)
+	if buttonSource.data["press"][-1] == 1 or len(buttonSource.data["press"]) ==1:
+		currLayout.remove(curdoc().get_model_by_name('pl'))
+		currLayout.remove(curdoc().get_model_by_name('pr'))
 	else:
-		readsList = []
-		for line in f:
-			line = line.decode('utf-8').strip().split('\t')
-			readsList.append(line[0].split('->') + [line[3], line[11]])
-		myDF = pd.DataFrame(readsList, columns=['fusion', 'gene', 'id', 'seq'])
-		readIDs, leftSeq, rightSeq = getReadOrder(myDF, fusionName, currChromPoints)
-		pl, myData = view_alignment(readIDs, leftSeq, currChromPoints[0], 'left', plot_width=int(len(readIDs[0])*5.58) + 300)
-		pr, temp = view_alignment(readIDs, rightSeq, currChromPoints[1], 'right', plot_width=300)
-		pl.on_event(Tap, chart_click_callback)
-		hiddenFilteredSource.data.update(myData.data)
-		hiddenShortSource.data.update(ColumnDataSource(myDF).data)
-	currLayout.remove(curdoc().get_model_by_name('pl'))
-	currLayout.remove(curdoc().get_model_by_name('pr'))
-	currLayout.append(pl)
-	currLayout.append(pr)
+		for i in range(buttonSource.data["figs"][-1]):
+			currLayout.remove(curdoc().get_model_by_name('p' + str(i)))
+	for i in figList:
+		currLayout.append(i)
 	curdoc().get_model_by_name('informUser').text = 'reads uploaded'
 
 def upload_table_data(attr, old, new):
 	curdoc().get_model_by_name('informUser').text = 'uploading fusions'
 	decoded = b64decode(new)
 	f = io.BytesIO(decoded)
-	new_df = pd.read_csv(f, sep='\t', index_col=False, error_bad_lines=False) #DROPS 3-gene fusions completely
-	if "confirmed reads" in new_df.columns:
-		new_df['spanning reads'] = new_df['confirmed reads']
-	elif "confirmed reads" in tableSource.data:
-		tableSource.remove("confirmed reads")
-	new_df = new_df.sort_values('spanning reads', ascending=False)
+	totalData = []
+	count = 0
+	c = 0
+	for line in f:
+		line = line.decode('utf-8').strip().split('\t')
+		if c == 0:
+			line.insert(1, "subgroup")
+		else:
+			line.insert(1, " ")
+		c += 1
+		genes = line[0].split('--')
+		totalData.append(line)
+		if len(genes) > 2:
+			count += 1
+			for i in range(len(genes)-1):
+				temp = [" "]*len(line)
+				temp[10] = line[-(((len(genes)-1)*2)-(2*i))]
+				temp[11] = line[-(((len(genes)-1)*2)-(2*i)-1)]
+				temp[1] = "--".join(genes[i:i+2])
+				totalData.append(temp)
+	if count == 0:
+		curdoc().get_model_by_name('tableSource').columns = [curdoc().get_model_by_name('tableSource').columns[0]] + curdoc().get_model_by_name('tableSource').columns[2:]
+	else:
+		if len(curdoc().get_model_by_name('tableSource').columns) < 7:
+			curdoc().get_model_by_name('tableSource').columns.insert(1, TableColumn(field = " ", title = "Subgroup Name", formatter=StringFormatter(), width=450))
+	headers = totalData.pop(0)
+	new_df = pd.DataFrame(totalData, columns=headers)
 	tableSource.data.update(ColumnDataSource(new_df).data)
+	data_table = data_table_formatter(0, tableSource)
+	currLayout = curdoc().get_model_by_name('subColumn').children
+	currLayout.remove(curdoc().get_model_by_name("tableSource"))
+	currLayout.append(data_table)
 	curdoc().get_model_by_name('informUser').text = 'fusions uploaded'
+
+def makeFilteredData2(fusion_name, currChromPoints, reads_file):
+	bounds = []
+	flip = []
+	myReads = reads_file
+	readsFiltered = myReads.loc[(myReads['fusionID'] == fusion_name), :].copy() #filter
+	readsFiltered["geneName"] = readsFiltered["geneName"].str.split(".").str[0]
+	currName = fusion_name.split("--")
+	currChrom = [i[1] for i in currChromPoints]
+	currPoints = [int(i[2]) for i in currChromPoints]
+	plotCount = 2 if len(currChromPoints) == 2 else int(2 + (len(currChromPoints) - 2) / 2)
+	for i in range(plotCount):
+		tempReads = readsFiltered[readsFiltered["geneName"] == currName[i]] #filter
+		if (len(tempReads) > 0):
+			if (i == 0  or i == plotCount-1):
+				if i == plotCount-1: i = len(currChromPoints)-1
+				tempMin = tempReads["chromStart"].min()
+				tempMax = tempReads["chromEnd"].max()
+				tickSpace = (tempMax-tempMin)/ 10
+				if abs(tempMin-currPoints[i]) > abs(tempMax-currPoints[i]):
+					bounds.append([int(tempMin-tickSpace), currPoints[i]])
+					flip.append(False) if i == 0 else flip.append(True)
+				else:
+					bounds.append([currPoints[i], int(tempMax+tickSpace)])
+					flip.append(True) if i == 0 else flip.append(False)
+			else:
+				bounds.append([currPoints[2*i-1], currPoints[2*i]])
+				flip.append(False)
+		else:
+			bounds.append([0, 0])
+			flip.append(False)
+	if len(readsFiltered) > 0:
+		readsFiltered = readsFiltered[readsFiltered['readID'].isin(list(set(readsFiltered['readID']))[:200])]
+		sizes = readsFiltered['blockSizes'].str.split(',', expand=True).stack().str.strip().reset_index(level=1, drop=True)
+		starts = readsFiltered['blockStarts'].str.split(',', expand=True).stack().str.strip().reset_index(level=1, drop=True)
+		temp = pd.concat([starts,sizes], axis=1, keys=['starts','sizes'])
+		readsExpanded = readsFiltered.join(temp).reset_index(drop=True)
+		readsExpanded[['starts', 'sizes']] = readsExpanded[['starts', 'sizes']].apply(pd.to_numeric)
+		readsExpanded['tStart'] = readsExpanded['starts'] + readsExpanded['chromStart']
+		readsExpanded['tEnd'] = readsExpanded['sizes'] + readsExpanded['tStart']
+		readsFiltered['tStart'] = readsFiltered['chromStart']
+		readsFiltered['tEnd'] = readsFiltered['chromEnd']
+		return readsExpanded, readsFiltered, currChrom, currPoints, bounds, flip
+	else:
+		return readsFiltered, readsFiltered, [], [], [], []
+
+def makeFullPlot2(fusion_name, currChromPoints, reads_file, anoSource):
+	readsFiltered, readsFilteredT, currChrom, currPoints, bounds,flip = makeFilteredData2(fusion_name, currChromPoints, reads_file)
+	anots = pd.DataFrame.from_dict(anoSource.data)
+	anotsNew = (anots[(anots['chrom'] == currChrom[0]) & (
+			((anots['tStart'] > bounds[0][0]) & (anots['tStart'] < bounds[0][1])) | (
+			(anots['tEnd'] > bounds[0][0]) & (anots['tEnd'] < bounds[0][1])))])
+	currChromSet = list(set(currChrom))
+	for i in range(1, len(currChromSet)):
+		anotsNew = anotsNew.append(anots[(anots['chrom'] == currChromSet[i]) & (
+				((anots['tStart'] > bounds[i][0]) & (anots['tStart'] < bounds[i][1])) | (
+				(anots['tEnd'] > bounds[i][0]) & (anots['tEnd'] < bounds[i][1])))])
+	anotsNew = anotsNew.rename(columns={'name': 'readID'})
+	anotsT = anotsNew.loc[(anotsNew['type'] == 't'), :].copy()
+	# anotsT = anotsT.append(readsFilteredT)
+	anotsNew = anotsNew[anotsNew['type'] == 'e']
+
+	cdsList = []
+	cdsTList = []
+	currChromPointsSet = list(dict.fromkeys([a[0] for a in currChromPoints]))
+	for i in range(len(currChromPointsSet)):
+		tempDF = readsFiltered[readsFiltered["geneName"] == currChromPointsSet[i]]
+		print(tempDF.head(20))
+		cdsList.append(ColumnDataSource(tempDF[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']]))
+		tempDF = readsFilteredT[readsFilteredT["geneName"] == currChromPointsSet[i]]
+		cdsTList.append(ColumnDataSource(tempDF[['readID', 'fusionID', 'geneName', 'chrom', 'tStart', 'tEnd']]))
+
+	if '|' in readsFiltered.at[0, 'readID']:
+		readsFiltered['isoSupport'] = readsFiltered['readID'].str.split('|', expand=True)[0].astype(int)
+		readsFiltered = readsFiltered.sort_values(by='isoSupport')
+	readsFiltered = readsFiltered.append(anotsNew) #ones with e
+	if len(readsFiltered) > 0:
+		source = ColumnDataSource(readsFiltered[['readID','fusionID','geneName','chrom', 'tStart', 'tEnd']])
+		sourceT = ColumnDataSource(anotsT[['readID', 'chrom', 'tStart', 'tEnd']])
+		readsFiltered = readsFiltered.reset_index(drop=True)
+		tools=[BoxZoomTool(dimensions='width'), WheelZoomTool(dimensions='width'), PanTool(), ResetTool()]
+		colorList = ["blue", "green", "magenta", "orange", "gold", "pink"]
+		figList = []
+		plotCount = 2 if len(currChromPoints) == 2 else int(2 + (len(currChromPoints) - 2) / 2)
+
+		for i in range(plotCount):
+			plotLoc = i
+			if not (i == 0 or i == plotCount - 1):
+				plotLoc = i * 2 - 1
+			plotWidth = 300 if i > 0 else (len(readsFiltered.loc[0, 'readID']) * 6) + 300
+			if i == plotCount - 1: plotLoc = len(currChromPoints) - 1
+			if (bounds[i] != [0, 0]):
+				if flip[i]:
+					bounds[i] = bounds[i][::-1]
+				fig = figure(name=('p'+str(i)), title=currChromPoints[plotLoc][0] + " " + str(currChrom[plotLoc]), y_range=list(OrderedDict.fromkeys(readsFiltered['readID'])),
+							plot_width = plotWidth, plot_height=len(list(set(readsFiltered['readID'])))*15+220,
+							x_range=(bounds[i][0], bounds[i][1]), tools=tools, toolbar_location=None, min_border_bottom=100, min_border_top=100)
+				fig.segment(x0='tStart', y0='readID', x1='tEnd', y1='readID', color=colorList[i], line_width=6, source=cdsList[i])
+				fig.segment(x0='tStart', y0='readID', x1='tEnd', y1='readID', color=colorList[i], line_width=1,
+							source=sourceT)
+				fig.segment(x0='tStart', y0='readID', x1='tEnd', y1='readID', color=colorList[i], line_width=1,
+							source=cdsTList[i])
+				fig.renderers.extend([Span(location=currPoints[plotLoc], dimension='height', line_color='red', line_width=3)])
+				if not (i == 0 or i == plotCount - 1):
+					fig.renderers.extend([Span(location=currPoints[plotLoc+1], dimension='height', line_color='red', line_width=3)])
+				fig.below[0].formatter.use_scientific = False
+				fig.add_layout(LinearAxis(formatter=BasicTickFormatter(use_scientific=False), major_label_orientation = pi/4), 'above')
+				fig.xaxis.major_label_orientation = pi/4
+				fig.ygrid.grid_line_color = None
+				fig.y_range.range_padding = 0
+				fig.yaxis.visible = False
+				figList.append(fig)
+			else:
+				fig = figure(name=('p'+str(i)), title=currChromPoints[plotLoc][0] + " " + str(currChrom[plotLoc]), y_range=list(OrderedDict.fromkeys(readsFiltered['readID'])),
+							plot_width = plotWidth, plot_height=len(list(set(readsFiltered['readID'])))*15+220,
+							x_range=(0, 1), tools=tools, toolbar_location=None, min_border_bottom=100, min_border_top=100)
+				fig.yaxis.visible = False
+				figList.append(fig)
+		figList[0].yaxis.visible = True
+		figList[-1].toolbar_location = "right"
+		return figList
+
+	else:
+		return [figure(), figure()]
 
 pageTitle = Div(text='Long read gene fusion visualization', style={'font-size': '24px', 'text-decoration':'underline'})
 fusionUploadTitle = Div(text='Fusion file (.tsv)', name='fusionUploadText')
@@ -381,11 +455,29 @@ readsUpload = FileInput(accept=".bed", name='reads')
 readsUpload.on_change('value', upload_reads_data)
 fastaUploadTitle = Div(text='Fusion fragments aligned to original reads file (.bed, optional)')
 fastaUpload = FileInput(accept=".bed", name='fareads')
-fastaUpload.on_change('value', upload_fasta_data)
 informUser = Div(text='updates will appear here', name='informUser')
 tableSource.selected.on_change('indices', table_click_callback)
+buttonSource = ColumnDataSource(data=dict(press=[0], figs=[2]))
 
-subColumn = column([pageTitle, fusionUploadTitle, fusionUpload, readsUploadTitle, readsUpload, fastaUploadTitle, fastaUpload, informUser, data_table], name='subColumn')
+def buttonClick(attr):
+	hiddenButtonSource.data.update(ColumnDataSource({"selected":[attr]}).data)
+	table_click_callback(0, 0, 0)
+def saveClick(attr):
+	# currLayout = curdoc().get_model_by_name('mainLayout').children
+	# curdoc().get_model_by_name()
+	# for i in length of plots:
+		# export_png(curdoc().get_model_by_name("p"+string(length)), filename="plot0.png")
+	export_png(curdoc().get_model_by_name("p0"), filename="plot0.png")
+	export_png(curdoc().get_model_by_name("p1"), filename="plot1.png")
+
+#https://stackoverflow.com/questions/34465697/python-bokeh-radio-button-group
+buttons = RadioButtonGroup(labels=['Full View', 'Remapped Alignment View', 'Isoform Full Length View'], active=0)
+buttons.on_click(buttonClick)
+
+
+button = Button(label="Save")
+button.on_click(saveClick)
+
+subColumn = column([pageTitle, fusionUploadTitle, fusionUpload, readsUploadTitle, readsUpload, fastaUploadTitle, fastaUpload, buttons, button, informUser, data_table], name='subColumn')
 mainLayout = row([subColumn, pl, pr], name='mainLayout')
 curdoc().add_root(mainLayout)
-
