@@ -46,12 +46,12 @@ curdoc().theme = theme
 annotations = pd.read_csv('gencode.v37.annotation-edited.tsv', sep='\t', index_col=False, header=0) #names=['chrom','chromStart','chromEnd','name','score','strand','thickStart','thickEnd','itemRgb',
 						   #'blockCount','blockSizes','blockStarts', 'starts', 'sizes', 'tStart', 'tEnd'])
 
-fusions = pd.read_csv('02-09-2020DRR-flair.alignedFusion-final.tsv', sep='\t', index_col=False)
-reads = pd.read_csv('02-09-2020DRR-flair.alignedReads-final.bed', sep='\t', index_col=False,
-					names=['chrom','chromStart','chromEnd','name','score','strand','thickStart','thickEnd','itemRgb',
-						   'blockCount','blockSizes','blockStarts', 'cigar', 'sequence'])
-reads[['fusionID','readID','geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:4] for x in reads['name']], index= reads.index)#temp[temp.columns[0:4]]
-reads['geneName'] = reads['geneName'].str.split('/', expand = True)[0]
+# fusions = pd.read_csv('02-09-2020DRR-flair.alignedFusion-final.tsv', sep='\t', index_col=False)
+# reads = pd.read_csv('02-09-2020DRR-flair.alignedReads-final.bed', sep='\t', index_col=False,
+# 					names=['chrom','chromStart','chromEnd','name','score','strand','thickStart','thickEnd','itemRgb',
+# 						   'blockCount','blockSizes','blockStarts', 'cigar', 'sequence'])
+# reads[['fusionID','readID','geneName', 'seq']] = pd.DataFrame([x.split('-.-')[:4] for x in reads['name']], index= reads.index)#temp[temp.columns[0:4]]
+# reads['geneName'] = reads['geneName'].str.split('/', expand = True)[0]
 currFusion = 0
 
 def getReadOrder(myDF, fusionName, currChromPoints):
@@ -167,13 +167,13 @@ def data_table_formatter(selected_opt, table_source):
 						   reorderable=False, name='tableSource', sortable=True, row_height=30)
 	return data_table
 
-hiddenSource = ColumnDataSource(reads)
+hiddenSource = ColumnDataSource()#reads)
 hiddenShortSource = ColumnDataSource()
 hiddenFilteredSource = ColumnDataSource()
 hiddenFastaSource = ColumnDataSource()
 hiddenButtonSource = ColumnDataSource(data={"selected":[0]})
 pl, pr = figure(name = "pl"), figure(name = "pr")
-tableSource = ColumnDataSource(fusions)
+tableSource = ColumnDataSource()#fusions)
 anoSource = ColumnDataSource(annotations)
 data_table = data_table_formatter(0, tableSource)
 
