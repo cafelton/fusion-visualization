@@ -31,7 +31,6 @@ from bokeh.models import ColumnDataSource
 from bokeh.io import export_png
 from PIL import Image
 import base64
-import selenium
 
 theme = Theme(json={
 	'attrs': {
