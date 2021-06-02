@@ -469,6 +469,7 @@ def saveClick(attr):
 		# export_png(curdoc().get_model_by_name("p"+string(length)), filename="plot0.png")
 	export_png(curdoc().get_model_by_name("p0"), filename="plot0.png")
 	export_png(curdoc().get_model_by_name("p1"), filename="plot1.png")
+	curdoc().get_model_by_name('informUser').text = 'files saved'
 
 #https://stackoverflow.com/questions/34465697/python-bokeh-radio-button-group
 buttons = RadioButtonGroup(labels=['Full View', 'Remapped Alignment View', 'Isoform Full Length View'], active=0)
